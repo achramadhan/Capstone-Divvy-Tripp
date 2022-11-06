@@ -1,0 +1,218 @@
+---
+title: "DivvyTripdata-2022-april-to-september"
+author: "Rama"
+date: "2022-10-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Latar Belakang Studi Kasus
+Studi Kasus ini menggunakan data set  Divvy Tripp from january 2021 to april 2021 "(found here: https://divvy-tripdata.s3.amazonaws.com/index.html)."
+
+### Tentang Perusahaan
+Pada 2016, Cyclistic meluncurkan penawaran berbagi sepeda yang sukses. Sejak itu, program tersebut telah berkembang menjadi armada 5.824 sepeda yang dilacak secara geografis dan dikunci ke dalam jaringan 692 stasiun di seluruh Chicago. Sepeda dapat diakses dari satu stasiun dan dikembalikan ke stasiun lainnya kapan pun di dalam sistem.
+
+Sampai saat ini, strategi pemasaran Cyclistic mengandalkan upaya untuk membangun kesadaran umum dan menarik segmen konsumen yang luas. Salah satu pendekatan yang membantu mewujudkan hal ini adalah fleksibilitas harga: tiket sekali jalan, tiket sehari penuh, dan keanggotaan tahunan. Pelanggan yang membeli tiket sekali jalan atau tiket sehari penuh disebut sebagai pengendara Casual. Pelanggan yang membeli keanggotaan tahunan adalah anggota Cyclistic (member).
+
+### Tiga pertanyaan:
+1.	Bagaimana anggota tahunan dan pengendara biasa menggunakan sepeda secara berbeda?
+2.	Mengapa pengendara biasa membeli keanggotaan tahunan Cyclistic?
+3.	Bagaimana Cyclistic menggunakan media digital untuk mempengaruhi pengendara biasa untuk menjadi anggota?
+
+
+### Tahap Persiapan 
+studi kasus ini menggunakan library tidyverse, lubridate, dan ggplot2
+```{r results='hide'}
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(janitor)
+```
+
+
+### Import File
+studi kasus ini menggunakan data set Divvy tripdata yaitu pada tahun 2021 dari bulan januari sampai bulan april
+
+```{r echo=T, results='hide'}
+
+tripdata_01 <- read.csv("202204-divvy-tripdata.csv") %>% clean_names()
+tripdata_02 <- read.csv("202205-divvy-tripdata.csv") %>% clean_names()
+tripdata_03 <- read.csv("202206-divvy-tripdata.csv") %>% clean_names()
+tripdata_04 <- read.csv("202207-divvy-tripdata.csv") %>% clean_names()
+tripdata_05 <- read.csv("202208-divvy-tripdata.csv") %>% clean_names()
+tripdata_06 <- read.csv("202209-divvy-tripdata.csv") %>% clean_names()
+```
+
+untuk membaca file, masing-masing menggunakan read.csv untuk membaca file tersebut dan disimpan ke dalam data frame tripdata_
+
+## Proses Data
+untuk memastikan data yang dibutuhkan konsisten format dan nama kolomnya, menggunakan fungsi "colnames" dan "str"
+```{r echo=T, results='hide'}
+
+colnames(tripdata_01)
+colnames(tripdata_02)
+colnames(tripdata_03)
+colnames(tripdata_04)
+colnames(tripdata_05)
+colnames(tripdata_06)
+
+str(tripdata_01)
+str(tripdata_02)
+str(tripdata_03)
+str(tripdata_04)
+str(tripdata_05)
+str(tripdata_06)
+```
+
+"colnames(tripdata_01)" digunakan untuk menampilkan nama kolom dari data tripdata_01 dan "str(tripdata_01)" digunakan untuk melihat metadata, seperti nama kolom, jumlah baris dan kolom, tipe data, dan isi ringkasan data
+
+
+### menggabungkan semua file menjadi satu
+setelah membaca ke 4 file dan melihat apakah data tersebut konsisten, lalu menggabungkannya menjadi satu menggunakan perintah "bind_rows" dan menampilkannya menggunakan "head"
+
+```{r echo=TRUE}
+all_trips <- bind_rows(tripdata_01, tripdata_02, tripdata_03, tripdata_04, tripdata_05, tripdata_06)
+```
+"all_trips" digunakan untuk membuat data.frame baru dari ke 4 data.frame tersebut
+
+
+### membuang kolom yang tidak diperlukan
+beberapa kolom tidak dibutuhkan jadi dibuang dalam data.frame yang dibuat
+```{r}
+all_trips <- all_trips %>%  select(-c(start_lat, start_lng, end_lat, end_lng))
+```
+ 
+
+## proses data
+
+mengubah tipe data pada kolom "started_at" dari char menjadi date, dan menyimpannya ke dalam kolom baru dan memisahkan hari, bulan, tahun, dan mengubah kolom hari dari numeric menjadi nama hari
+```{r}
+
+all_trips$date <- as.Date(all_trips$started_at) 
+all_trips$month <- format(as.Date(all_trips$date), "%m")
+all_trips$day <- format(as.Date(all_trips$date), "%d")
+all_trips$year <- format(as.Date(all_trips$date), "%Y")
+all_trips$day_of_week <- format(as.Date(all_trips$date), "%A")
+
+```
+
+fungsi ("%d/%m/%Y") digunakan untuk format day, month, Year(4 digit), "%A" mengubah tanggal (angka) yang ada di kolom day_of_week menjadi nama hari berdasarkan data tersebut.
+
+```{r}
+head(all_trips)
+```
+
+menampilkan ringkasan isi tabel
+
+
+### membuat kolom baru ride_length
+```{r}
+all_trips$ride_length <- difftime(all_trips$ended_at,all_trips$started_at)
+
+```
+isi dari kolom ride_length adalah durasi pengendara dalam mengendarai sepeda, hasil tersebut didapat dari perbedaan waktu antara kolom "started_at" dengan kolom "ended_at"
+
+### mengubah tipe data
+```{r}
+
+head(all_trips$ride_length)
+all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length))
+```
+kolom ride_length memiliki tipe data karakter yaitu secs, dan mengubahnya ke numerik
+
+
+ringkasang cepat untuk kolom ride_length
+```{r}
+summary(all_trips$ride_length)
+```
+setelah mendapatkan ringkasan cepat, ternyata minimum ride_length terdapat angka kurang dari 0, untuk itu membuat data baru dengan kondisi kolom ride length tidak kurang dari 0
+
+### Pembuatan Tabel Baru 
+membuat tabel baru dari data yang telah disiapkan, sebelum melakukan analisis
+
+```{r}
+all_trips_v2 <- all_trips[!(all_trips$ride_length<0),]
+```
+
+## analisis
+menggunakan fungsi summary untuk melihat median, mean, max, min dari kolom "ride_length"
+
+```{r}
+
+summary(all_trips_v2$ride_length)
+
+```
+
+mencari nilai maximum tiap anggota dari kolom ride_length berdasarkan harian, agar rapih mengurutkan kolom day_of_week dimulai dari hari minggu
+
+```{r}
+
+all_trips_v2$day_of_week <- ordered(all_trips_v2$day_of_week, levels=c("Sunday", "Monday","Tuesday", "Wednesday", "Thursday","Friday", "Saturday"))
+
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = max)
+```
+
+mencari nilai rata-rata pada kolom ride_length berdasarkan tipe keanggotaan dan hari
+
+```{r message=FALSE, warning=FALSE}
+
+all_trips_v2 %>% mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  drop_na() %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides=n(), 
+            average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, weekday)
+```
+
+
+## Visualisasi
+
+```{r message=FALSE, warning=FALSE}
+all_trips_v2 %>% mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  drop_na() %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides=n(), 
+            average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(weekday, number_of_rides, fill=member_casual))+
+  geom_col(position = "dodge")
+
+```
+
+diagram di atas menunjukkan rata-rata pengendara tiap anggota melakukan berapa banyak perjalanan berdasarkan harian. dapat disimpulkan bahwa anggota member lebih banyak melakukan perjalanan dibandingkan dengan anggota casual
+
+
+```{r message=FALSE, warning=FALSE}
+
+all_trips_v2 %>% mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  drop_na() %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides=n(), 
+            average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(weekday, average_duration , fill=member_casual))+
+  geom_col(position = "dodge")
+```
+
+diagram di atas adalah rata-rata tiap anggota berdasarkan berapa lama tiap anggota melakukan perjalanan berdasarkan harian.Diagram menunjukkan bahwa anggota casual 2x lebih lama dibandingkan dengan anggota member.
+
+
+```{r message=FALSE, warning=FALSE}
+
+all_trips_v2 %>% mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  drop_na() %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides=n(), 
+            maximum_day = max(ride_length)) %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(weekday, maximum_day, fill=member_casual))+
+  geom_col(position = "dodge")+
+  geom_text(aes(label=maximum_day), position= position_dodge(0.9), vjust = 0.5, size = 2.5, angle = 45)
+```
+
+diagram di atas menunjukkan maksimum lama perjalanan dari masing-masing anggota berdasarkan harian, data yang ditunjukkan anggota casual di masing-masing hari selalu melebihi anggota member
+
